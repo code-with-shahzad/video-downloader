@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader API</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.2rem;
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        input[type="text"] {
+            flex: 1;
+            padding: 14px 18px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+        }
+        input[type="text"]:focus { box-shadow: 0 0 0 2px #e94560; }
+        input[type="text"]::placeholder { color: #666; }
+        .platforms { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; }
+        .platform-btn {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        .platform-btn:hover, .platform-btn.active {
+            background: rgba(233, 69, 96, 0.2);
+            border-color: #e94560;
+        }
+        button.primary {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button.primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(233, 69, 96, 0.3); }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        .result.show { display: block; }
+        .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .result-header h3 { color: #e94560; font-size: 16px; }
+        .status { padding: 4px 12px; border-radius: 15px; font-size: 13px; }
+        .status.success { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+        .status.error { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+        pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 12px;
+            color: #aaa;
+        }
+        .loading { display: none; text-align: center; padding: 25px; }
+        .loading.show { display: block; }
+        .spinner {
+            width: 35px; height: 35px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .download-btn {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .info-grid { display: grid; gap: 8px; margin-bottom: 12px; }
+        .info-row { display: flex; gap: 8px; font-size: 14px; }
+        .info-label { color: #888; min-width: 80px; }
+        .info-value { color: #fff; word-break: break-all; }
+        .thumbnail { max-width: 250px; border-radius: 8px; margin-top: 12px; }
+        .endpoints { font-size: 13px; color: #666; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .endpoints code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Video Downloader API</h1>
+        <p class="subtitle">Get video info with download URL</p>
+
+        <div class="card">
+            <div class="input-group">
+                <input type="text" id="videoUrl" placeholder="Paste video URL here..." />
+            </div>
+
+            <div class="platforms">
+                <button class="platform-btn" onclick="selectPlatform('youtube')">📺 YouTube</button>
+                <button class="platform-btn" onclick="selectPlatform('tiktok')">🎵 TikTok</button>
+                <button class="platform-btn" onclick="selectPlatform('instagram')">📸 Instagram</button>
+                <button class="platform-btn" onclick="selectPlatform('twitter')">🐦 Twitter</button>
+            </div>
+
+            <button class="primary" onclick="getInfo()">📋 Get Video Info</button>
+
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Fetching video info...</p>
+        </div>
+
+        <div class="result" id="result">
+            <div class="result-header">
+                <h3>Response</h3>
+                <span class="status" id="status">Success</span>
+            </div>
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        let selectedPlatform = null;
+
+        function selectPlatform(platform) {
+            selectedPlatform = platform;
+            document.querySelectorAll('.platform-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function detectPlatform(url) {
+            if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+            if (url.includes('tiktok.com')) return 'tiktok';
+            if (url.includes('instagram.com')) return 'instagram';
+            if (url.includes('twitter.com') || url.includes('x.com')) return 'twitter';
+            return null;
+        }
+
+        async function getInfo() {
+            const url = document.getElementById('videoUrl').value.trim();
+            if (!url) { alert('Please enter a video URL'); return; }
+
+            const platform = selectedPlatform || detectPlatform(url);
+            if (!platform) { alert('Please select a platform or use a valid URL'); return; }
+
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('result').classList.remove('show');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/${platform}/info`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                const data = await response.json();
+                showResult(data, !data.success);
+            } catch (error) {
+                showResult({ error: error.message }, true);
+            }
+        }
+
+        function showResult(data, isError) {
+            document.getElementById('loading').classList.remove('show');
+            document.getElementById('result').classList.add('show');
+            document.getElementById('status').className = `status ${isError ? 'error' : 'success'}`;
+            document.getElementById('status').textContent = isError ? 'Error' : 'Success';
+
+            let html = '';
+            if (!isError && data.data) {
+                const d = data.data;
+                html = '<div class="info-grid">';
+                if (d.title) html += `<div class="info-row"><span class="info-label">Title:</span><span class="info-value">${d.title}</span></div>`;
+                if (d.author) html += `<div class="info-row"><span class="info-label">Author:</span><span class="info-value">${d.author}</span></div>`;
+                if (d.platform) html += `<div class="info-row"><span class="info-label">Platform:</span><span class="info-value">${d.platform}</span></div>`;
+                if (d.duration) html += `<div class="info-row"><span class="info-label">Duration:</span><span class="info-value">${d.duration}</span></div>`;
+                if (d.source) html += `<div class="info-row"><span class="info-label">Source:</span><span class="info-value">${d.source}</span></div>`;
+                html += '</div>';
+                if (d.thumbnail) html += `<img src="${d.thumbnail}" class="thumbnail" onerror="this.style.display='none'"/>`;
+                if (d.downloadUrl) html += `<a href="${d.downloadUrl}" target="_blank" class="download-btn">⬇️ Download Video</a>`;
+            }
+            html += `<details style="margin-top:15px"><summary style="cursor:pointer;color:#888;font-size:13px">Raw JSON</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+            document.getElementById('resultContent').innerHTML = html;
+        }
+
+        document.getElementById('videoUrl').addEventListener('keypress', e => { if (e.key === 'Enter') getInfo(); });
+    </script>
+</body>
+</html>
