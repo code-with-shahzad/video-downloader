@@ -61,3 +61,49 @@ export function sanitizeFilename(filename: string): string {
         .replace(/\s+/g, '_')
         .substring(0, 100);
 }
+
+const validateDownloadResponse = (formats: any) => {
+    if (!formats?.length) return { url: null, format: [] };
+
+    const videoExts = ["mp4", "webm", "mov"];
+    const videoFormats = formats.filter((f: any) => videoExts.includes(f?.ext) && f?.vcodec !== 'none');
+    const bestVideo = videoFormats.sort((a: any, b: any) => (b?.width || 0) - (a?.width || 0))[0];
+
+    return {
+        url: bestVideo?.url || formats[0]?.url || null,
+        format: formats.map((item: any) => ({
+            url: item?.url || null,
+            type: item?.vcodec !== 'none' ? "video" : "audio",
+            resolution: item?.resolution,
+            ext: item?.ext,
+        })),
+    };
+};
+
+
+export const validateYtdlpResponse = (result: any) => {
+    const downloadData = validateDownloadResponse(result?.formats || result?.requested_downloads);
+
+    return {
+        url: downloadData?.url || result?.url,
+        title: result?.title,
+        description: result?.description,
+        duration: result?.duration,
+        author: {
+            uuid: result?.uploader_id,
+            username: result?.uploader,
+            nickname: result?.channel,
+            url: result?.uploader_url,
+        },
+        thumbnail: result?.thumbnails?.[0]?.url || result?.thumbnail,
+        type: result?._type || 'video',
+        statistics: {
+            playCount: result?.view_count,
+            likesCount: result?.like_count,
+            commentCount: result?.comment_count,
+            shareCount: result?.repost_count
+        },
+        download_data: downloadData,
+    };
+};
+
