@@ -55,21 +55,24 @@ async function getTiktokInfo(url: string): Promise<unknown> {
         const tiktokDl = await TikTokAPI.Downloader(url, { version: 'v1' });
         const result = tiktokDl.result;
         return {
-            url: result?.video?.playAddr,
+            url: result?.video?.playAddr?.length ? result?.video?.playAddr[0] : result?.video?.playAddr,
             author: result?.author,
-            thumbnail: result?.images,
+            thumbnail: result?.video?.originCover?.length ? result?.video?.originCover[0] : result?.video?.originCover,
             type: result?.type,
             statistics: result?.statistics,
+            description: result?.desc,
+            duration: result?.video?.duration,
         };
     } catch {
         const tiktokDl = await TikTokAPI.Downloader(url, { version: 'v2' });
         const result = tiktokDl.result;
         return {
-            url: result?.video?.playAddr,
+            url: result?.video?.playAddr?.length ? result?.video?.playAddr[0] : result?.video?.playAddr,
             author: result?.author,
-            thumbnail: result?.images,
+            thumbnail: result?.images?.length ? result?.images[0] : result?.images,
             type: result?.type,
             statistics: result?.statistics,
+            description: result?.desc,
         };
     }
 }
