@@ -23,7 +23,7 @@
     "ytdlp-nodejs": "^2.3.5"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
