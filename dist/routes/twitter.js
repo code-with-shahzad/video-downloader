@@ -11,6 +11,10 @@ router.post('/info', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Valid URL is required' });
         }
         const data = await (0, downloader_service_1.getVideoInfo)(url, 'twitter');
+        const isPlayable = await (0, helpers_1.isBrowserPlayableVideo)(data?.url);
+        if (!data || !data.url || data.url.trim() === '' || data instanceof Error || !isPlayable) {
+            return res.status(500).json({ success: false, error: data?.message || 'Failed to get video info' });
+        }
         return res.json({ success: true, data });
     }
     catch (error) {

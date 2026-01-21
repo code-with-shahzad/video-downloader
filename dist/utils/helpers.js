@@ -5,6 +5,7 @@ exports.detectPlatform = detectPlatform;
 exports.isValidUrl = isValidUrl;
 exports.formatDuration = formatDuration;
 exports.sanitizeFilename = sanitizeFilename;
+exports.isBrowserPlayableVideo = isBrowserPlayableVideo;
 /**
  * Detects the platform from a URL
  */
@@ -98,4 +99,31 @@ const validateYtdlpResponse = (result) => {
     };
 };
 exports.validateYtdlpResponse = validateYtdlpResponse;
+async function isBrowserPlayableVideo(url) {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(url, {
+            headers: {
+                Range: "bytes=0-1023",
+            },
+            signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (![200, 206].includes(res.status))
+            return false;
+        const type = res.headers.get("content-type") || "";
+        const isVideo = type.startsWith("video/") ||
+            type === "application/octet-stream";
+        if (!isVideo)
+            return false;
+        const buf = Buffer.from(await res.arrayBuffer());
+        return (buf.includes(Buffer.from("ftyp")) ||
+            buf.includes(Buffer.from("webm")) ||
+            buf.includes(Buffer.from("OggS")));
+    }
+    catch {
+        return false;
+    }
+}
 //# sourceMappingURL=helpers.js.map
