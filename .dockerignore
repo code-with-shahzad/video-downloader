@@ -1,75 +1,11 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Directory for instrumented libs
-lib-cov
-
-# Coverage directory
-coverage
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-node_modules/
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Build output
-dist/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Git
+node_modules
+dist
+npm-debug.log
 .git
 .gitignore
-.gitattributes
-
-# Documentation
+.env
+.env.*
 *.md
-!README.md
-
-# Development config files (not needed for build)
-.editorconfig
-.prettierrc
-.prettierignore
-
-# Test files
-test/
-tests/
-*.test.ts
-*.test.js
-*.spec.ts
-*.spec.js
+.vscode
+.idea
+*.log
