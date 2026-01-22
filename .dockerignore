@@ -61,8 +61,11 @@ Thumbs.db
 *.md
 !README.md
 
-# Development files
-src/
+# Development files - exclude TypeScript source but keep service files
+src/**/*.ts
+src/**/*.tsx
+!src/services/binary/**
+!src/services/cookies/**
 tsconfig.json
 .editorconfig
 .prettierrc
