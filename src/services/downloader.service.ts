@@ -16,16 +16,29 @@ function firstExisting(paths: string[]): { path: string; exists: boolean } {
   return { path: paths[paths.length - 1], exists: false };
 }
 
-const COOKIES_PATH = path.resolve(process.cwd(), "src/services/cookies/cookies.txt");
-const BINARY_PATH = path.resolve(process.cwd(), "src/services/binary/yt-dlp");
-console.info("[downloader] cookies path:", COOKIES_PATH);
-console.info("[downloader] binary path:", BINARY_PATH);
+const cookiesSearchPaths = [
+  path.resolve(process.cwd(), "cookies/cookies.txt"),
+  path.resolve(process.cwd(), "src/services/cookies/cookies.txt"),
+];
+
+const binarySearchPaths = [
+  path.resolve(process.cwd(), "binary/yt-dlp"),
+  path.resolve(process.cwd(), "src/services/binary/yt-dlp"),
+  "/usr/local/bin/yt-dlp",
+  "yt-dlp",
+];
+
+const { path: COOKIES_PATH, exists: HAS_COOKIES } = firstExisting(cookiesSearchPaths);
+const { path: BINARY_PATH, exists: HAS_BINARY } = firstExisting(binarySearchPaths);
+
+console.info("[downloader] cookies path:", COOKIES_PATH, "exists:", HAS_COOKIES);
+console.info("[downloader] binary path:", BINARY_PATH, "exists:", HAS_BINARY);
 
 const YTDLP_ARGS = [
   '--dump-json',
   '--js-runtimes',
   'node',
-  // ...(HAS_COOKIES ? ['--cookies', COOKIES_PATH] : []),
+  ...(HAS_COOKIES ? ['--cookies', COOKIES_PATH] : []),
 ];
 
 const ytDlp = new YtDlp({
@@ -81,7 +94,7 @@ async function getYtDlpInfo(url: string): Promise<unknown> {
     format: "bestvideo+bestaudio/best",
     dumpSingleJson: true,
     noDownload: true,
-    // ...(HAS_COOKIES ? { cookies: COOKIES_PATH } : {}),
+    ...(HAS_COOKIES ? { cookies: COOKIES_PATH } : {}),
   });
   return typeof result === "string" ? JSON.parse(result) : result;
 }
