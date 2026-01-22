@@ -1,9 +1,5 @@
-# Simple & Strong Dockerfile for Video Downloader API
-
-# ========== BUILD STAGE ==========
 FROM node:20-alpine AS builder
 
-# Install build dependencies for native modules (canvas)
 RUN apk add --no-cache \
     python3 \
     build-base \
@@ -16,18 +12,14 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copy package files and install ALL dependencies (including dev)
 COPY package*.json ./
 RUN npm ci
 
-# Copy source and build TypeScript
 COPY . .
 RUN npm run build
 
-# ========== PRODUCTION STAGE ==========
 FROM node:20-alpine
 
-# Install yt-dlp globally + ffmpeg + python + canvas dependencies
 RUN apk add --no-cache \
     python3 \
     py3-pip \
@@ -44,20 +36,15 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copy package files and install production only
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Copy public folder
 COPY public ./public
 
-# Expose port
 EXPOSE 3000
 
-# Set environment
 ENV NODE_ENV=production
 ENV PORT=3000
 
