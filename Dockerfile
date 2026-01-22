@@ -3,6 +3,17 @@
 # ========== BUILD STAGE ==========
 FROM node:20-alpine AS builder
 
+# Install build dependencies for native modules (canvas)
+RUN apk add --no-cache \
+    python3 \
+    build-base \
+    pkgconfig \
+    cairo-dev \
+    pango-dev \
+    jpeg-dev \
+    giflib-dev \
+    pixman-dev
+
 WORKDIR /app
 
 # Copy package files and install ALL dependencies (including dev)
@@ -40,9 +51,8 @@ RUN npm ci --omit=dev
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Copy cookies and binary folders if needed
-COPY cookies ./cookies
-COPY binary ./binary
+# Copy public folder
+COPY public ./public
 
 # Expose port
 EXPOSE 3000
