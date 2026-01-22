@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getVideoInfo } from '../services/downloader.service';
-import { isBrowserPlayableVideo, isValidUrl } from '../utils/helpers';
+import { getVideoInfo } from '../services/downloader.service.js';
+import { isBrowserPlayableVideo, isValidUrl } from '../utils/helpers.js';
 const router = Router();
 router.post('/info', async (req, res) => {
     try {

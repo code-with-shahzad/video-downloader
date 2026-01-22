@@ -3,10 +3,10 @@ import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 
-import youtubeRoutes from './routes/youtube';
-import tiktokRoutes from './routes/tiktok';
-import instagramRoutes from './routes/instagram';
-import twitterRoutes from './routes/twitter';
+import youtubeRoutes from './routes/youtube.js';
+import tiktokRoutes from './routes/tiktok.js';
+import instagramRoutes from './routes/instagram.js';
+import twitterRoutes from './routes/twitter.js';
 
 dotenv.config();
 

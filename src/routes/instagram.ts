@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { getVideoInfo } from '../services/downloader.service';
-import { isBrowserPlayableVideo, isValidUrl } from '../utils/helpers';
+import { getVideoInfo } from '../services/downloader.service.js';
+import { isBrowserPlayableVideo, isValidUrl } from '../utils/helpers.js';
 
 const router = Router();
 

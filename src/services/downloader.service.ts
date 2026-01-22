@@ -1,4 +1,4 @@
-import { detectPlatform, validateYtdlpResponse } from "../utils/helpers";
+import { detectPlatform, validateYtdlpResponse } from "../utils/helpers.js";
 import { YtDlp } from "ytdlp-nodejs";
 import YTDlpWrap from "yt-dlp-core";
 import TikTokAPI from "@tobyg74/tiktok-api-dl";
