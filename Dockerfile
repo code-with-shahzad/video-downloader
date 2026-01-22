@@ -32,7 +32,7 @@ RUN apk add --no-cache \
     curl \
     ca-certificates
 
-# Install yt-dlp globally
+# Install yt-dlp globally (primary method)
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp
 
@@ -51,13 +51,6 @@ RUN npm ci --only=production && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 
-# Copy service files from root (optional, will fallback to global yt-dlp)
-COPY binary ./binary 2>/dev/null || true
-COPY cookies ./cookies 2>/dev/null || true
-
-# Ensure yt-dlp binary is executable if it exists
-RUN chmod +x binary/yt-dlp 2>/dev/null || true
-
 # Change ownership to nodejs user
 RUN chown -R nodejs:nodejs /app
 
@@ -73,7 +66,7 @@ ENV PORT=3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/api/youtube/info', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
 # Start the application
 CMD ["node", "dist/index.js"]
