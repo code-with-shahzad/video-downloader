@@ -1,14 +1,7 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateYtdlpResponse = void 0;
-exports.detectPlatform = detectPlatform;
-exports.isValidUrl = isValidUrl;
-exports.formatDuration = formatDuration;
-exports.sanitizeFilename = sanitizeFilename;
 /**
  * Detects the platform from a URL
  */
-function detectPlatform(url) {
+export function detectPlatform(url) {
     const urlLower = url.toLowerCase();
     if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
         return 'youtube';
@@ -27,7 +20,7 @@ function detectPlatform(url) {
 /**
  * Validates URL format
  */
-function isValidUrl(url) {
+export function isValidUrl(url) {
     try {
         new URL(url);
         return true;
@@ -39,7 +32,7 @@ function isValidUrl(url) {
 /**
  * Formats duration from seconds to HH:MM:SS or MM:SS
  */
-function formatDuration(seconds) {
+export function formatDuration(seconds) {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
@@ -51,7 +44,7 @@ function formatDuration(seconds) {
 /**
  * Sanitizes filename for safe file system usage
  */
-function sanitizeFilename(filename) {
+export function sanitizeFilename(filename) {
     return filename
         .replace(/[<>:"/\\|?*]/g, '')
         .replace(/\s+/g, '_')
@@ -73,7 +66,7 @@ const validateDownloadResponse = (formats) => {
         })),
     };
 };
-const validateYtdlpResponse = (result) => {
+export const validateYtdlpResponse = (result) => {
     const downloadData = validateDownloadResponse(result?.formats || result?.requested_downloads);
     return {
         url: downloadData?.url || result?.url,
@@ -97,5 +90,31 @@ const validateYtdlpResponse = (result) => {
         download_data: downloadData,
     };
 };
-exports.validateYtdlpResponse = validateYtdlpResponse;
+export async function isBrowserPlayableVideo(url) {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(url, {
+            headers: {
+                Range: "bytes=0-1023",
+            },
+            signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (![200, 206].includes(res.status))
+            return false;
+        const type = res.headers.get("content-type") || "";
+        const isVideo = type.startsWith("video/") ||
+            type === "application/octet-stream";
+        if (!isVideo)
+            return false;
+        const buf = Buffer.from(await res.arrayBuffer());
+        return (buf.includes(Buffer.from("ftyp")) ||
+            buf.includes(Buffer.from("webm")) ||
+            buf.includes(Buffer.from("OggS")));
+    }
+    catch {
+        return false;
+    }
+}
 //# sourceMappingURL=helpers.js.map

@@ -39,4 +39,5 @@ export declare const validateYtdlpResponse: (result: any) => {
         format: any;
     };
 };
+export declare function isBrowserPlayableVideo(url: string): Promise<boolean>;
 //# sourceMappingURL=helpers.d.ts.map
