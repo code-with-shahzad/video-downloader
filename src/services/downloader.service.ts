@@ -6,18 +6,20 @@ import path from "path";
 import { existsSync } from "fs";
 import { fileURLToPath } from "url";
 
-// @ts-ignore
 const filename = fileURLToPath(import.meta.url);
-const directoryName = path.dirname(filename); 
+const directoryName = path.dirname(filename);
 
-const COOKIES_PATH = path.resolve(directoryName, "../../cookies/cookies.txt");
-// const HAS_COOKIES = existsSync(COOKIES_PATH);
+function firstExisting(paths: string[]): { path: string; exists: boolean } {
+  for (const candidate of paths) {
+    if (existsSync(candidate)) return { path: candidate, exists: true };
+  }
+  return { path: paths[paths.length - 1], exists: false };
+}
 
-const BINARY_PATH = existsSync(path.resolve(directoryName, "../../binary/yt-dlp"))
-  ? path.resolve(directoryName, "../../binary/yt-dlp")
-  : existsSync("/usr/local/bin/yt-dlp")
-  ? "/usr/local/bin/yt-dlp"
-  : "yt-dlp";
+const COOKIES_PATH = path.resolve(process.cwd(), "src/services/cookies/cookies.txt");
+const BINARY_PATH = path.resolve(process.cwd(), "src/services/binary/yt-dlp");
+console.info("[downloader] cookies path:", COOKIES_PATH);
+console.info("[downloader] binary path:", BINARY_PATH);
 
 const YTDLP_ARGS = [
   '--dump-json',
