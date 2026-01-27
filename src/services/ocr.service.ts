@@ -1,6 +1,24 @@
 import { createWorker } from 'tesseract.js';
 import fs from 'fs';
 
+let worker: any = null;
+
+async function getWorker() {
+    if (worker) return worker;
+    console.log('[OCR] Initializing persistent worker...');
+    worker = await createWorker('eng', 1, {
+        logger: m => null,
+    });
+    await worker.setParameters({
+        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyz0123456789. ',
+    });
+    return worker;
+}
+
+// Pre-initialize
+getScheduler().catch(() => { });
+async function getScheduler() { await getWorker(); }
+
 /**
  * Detects if a specific string exists within a set of images.
  * @param imagePaths - Array of absolute paths to images.
@@ -8,28 +26,27 @@ import fs from 'fs';
  * @returns Promise resolving to true if text is found in any image.
  */
 export async function detectTextInImages(imagePaths: string[], searchString: string): Promise<boolean> {
-    const worker = await createWorker('eng');
+    const ocrWorker = await getWorker();
 
     try {
         const searchTarget = searchString.toLowerCase().replace(/\s+/g, '');
-        const coreTarget = searchTarget.split('.')[0]; // e.g., 'ssstik'
+        const coreTarget = searchTarget.split('.')[0];
 
         for (const imagePath of imagePaths) {
-            // Check if file exists, wait a bit if not (filesystem sync)
             let exists = fs.existsSync(imagePath);
-            if (!exists) {
-                console.warn(`File not found immediately: ${imagePath}. Waiting 1s...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            let attempts = 0;
+            while (!exists && attempts < 5) {
+                await new Promise(resolve => setTimeout(resolve, 200));
                 exists = fs.existsSync(imagePath);
+                attempts++;
             }
 
             if (!exists) {
-                console.error(`File still not found after wait: ${imagePath}`);
+                console.error(`File still not found: ${imagePath}`);
                 continue;
             }
 
-            const { data: { text } } = await worker.recognize(imagePath);
-            // Clean more aggressively: remove everything except letters and numbers
+            const { data: { text } } = await ocrWorker.recognize(imagePath);
             const cleanedText = text.toLowerCase().replace(/[^a-z0-9]/g, '');
             console.log(`OCR Result for ${imagePath} (Cleaned):`, cleanedText);
 
@@ -40,8 +57,6 @@ export async function detectTextInImages(imagePaths: string[], searchString: str
         }
     } catch (error) {
         console.error('OCR failed:', error);
-    } finally {
-        await worker.terminate();
     }
 
     return false;

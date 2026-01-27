@@ -152,7 +152,7 @@ async function getTiktokInfo(url: string): Promise<unknown> {
           console.log(`Checking version ${version} for watermarks...`);
           const thumbnails = await extractThumbnails({
             videoPath: videoUrl,
-            timestamps: [1, 3, 5]
+            timestamps: [1, 2]
           });
 
           if (thumbnails.length > 0) {

@@ -30,12 +30,14 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
     return new Promise((resolve) => {
         ffmpeg(videoPath)
             .inputOptions([
-                '-t 6',
-                '-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                '-reconnect 1',
-                '-reconnect_at_eof 1',
-                '-reconnect_streamed 1',
-                '-reconnect_delay_max 2'
+                '-t 3',
+                '-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36\r\nReferer: https://tikcdn.io/ssstik/\r\n',
+                '-reconnect', '1',
+                '-reconnect_streamed', '1',
+                '-reconnect_delay_max', '2',
+                '-vsync', '0',
+                '-an',
+                '-sn'
             ])
             .on('filenames', (files: string[]) => {
                 files.forEach(file => filenames.push(path.join(outputDir, file)));
@@ -46,7 +48,6 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
             })
             .on('error', (err) => {
                 console.error('Error extracting thumbnails:', err);
-                // If it fails, return empty so we can handle it in the loop
                 resolve([]);
             })
             .screenshots({
