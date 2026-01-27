@@ -26,72 +26,37 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
     const { videoPath, timestamps, outputDir = DEFAULT_TEMP_DIR } = options;
     const filenames: string[] = [];
     const uniqueId = Date.now();
-    let inputStream: any = videoPath;
 
-    try {
-        // If videoPath is a URL, get the stream
-        if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
-            try {
-                const { default: axios } = await import('axios');
-                console.log(`Streaming video from ${videoPath}...`);
-
-                const response = await axios({
-                    method: 'GET',
-                    url: videoPath,
-                    responseType: 'stream',
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                        'Referer': 'https://ssstik.io/'
-                    }
-                });
-
-                if (response.status !== 200) {
-                    throw new Error(`Failed to stream video, status: ${response.status}`);
-                }
-
-                inputStream = response.data;
-            } catch (dlError) {
-                console.error('Error streaming video for thumbnail extraction:', dlError);
-                return [];
-            }
-        }
-
-        return new Promise((resolve) => {
-            ffmpeg(inputStream)
-                .inputOptions([
-                    '-t 3',
-                    '-vsync', '0',
-                    '-an',
-                    '-sn'
-                ])
-                .on('filenames', (files: string[]) => {
-                    files.forEach(file => filenames.push(path.join(outputDir, file)));
-                })
-                .on('end', async () => {
-                    console.log('Thumbnails extracted successfully:', filenames);
-                    if (inputStream && typeof inputStream.destroy === 'function') {
-                        inputStream.destroy();
-                    }
-                    resolve(filenames);
-                })
-                .on('error', async (err) => {
-                    console.error('Error extracting thumbnails:', err);
-                    if (inputStream && typeof inputStream.destroy === 'function') {
-                        inputStream.destroy();
-                    }
-                    resolve([]);
-                })
-                .screenshots({
-                    count: timestamps.length,
-                    timestamps: timestamps.map(t => t.toString()),
-                    folder: outputDir,
-                    filename: `thumb-${uniqueId}-%s.png`
-                });
-        });
-    } catch (e) {
-        console.error('Unexpected error in extractThumbnails:', e);
-        return [];
-    }
+    return new Promise((resolve) => {
+        ffmpeg(videoPath)
+            .inputOptions([
+                '-t 3',
+                '-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36\r\nReferer: https://tikcdn.io/ssstik/\r\n',
+                '-reconnect', '1',
+                '-reconnect_streamed', '1',
+                '-reconnect_delay_max', '2',
+                '-vsync', '0',
+                '-an',
+                '-sn'
+            ])
+            .on('filenames', (files: string[]) => {
+                files.forEach(file => filenames.push(path.join(outputDir, file)));
+            })
+            .on('end', () => {
+                console.log('Thumbnails extracted successfully:', filenames);
+                resolve(filenames);
+            })
+            .on('error', (err) => {
+                console.error('Error extracting thumbnails:', err);
+                resolve([]);
+            })
+            .screenshots({
+                count: timestamps.length,
+                timestamps: timestamps.map(t => t.toString()),
+                folder: outputDir,
+                filename: `thumb-${uniqueId}-%s.png`
+            });
+    });
 }
 
 /**
