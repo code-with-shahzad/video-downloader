@@ -26,61 +26,109 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
     const { videoPath, timestamps, outputDir = DEFAULT_TEMP_DIR } = options;
     const filenames: string[] = [];
     const uniqueId = Date.now();
+    let inputPath = videoPath;
+    let tempVideoPath: string | null = null;
 
-    return new Promise((resolve) => {
-        const isUrl = videoPath.startsWith('http://') || videoPath.startsWith('https://');
+    const cleanupTempVideo = async () => {
+        if (tempVideoPath && fs.existsSync(tempVideoPath)) {
+            try {
+                await fs.promises.unlink(tempVideoPath);
+            } catch (e) {
+                console.error('Failed to delete temp video:', e);
+            }
+        }
+    };
 
-        const command = ffmpeg();
+    try {
+        // If videoPath is a URL, download only what we need
+        if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
+            try {
+                const { default: axios } = await import('axios');
 
-        if (isUrl) {
-            // Set input with protocol options
-            command.input(videoPath)
-                .inputOptions([
-                    '-protocol_whitelist', 'file,http,https,tcp,tls',
-                    '-t', '3',
-                    '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    '-referer', 'https://ssstik.io/',
-                    '-reconnect', '1',
-                    '-reconnect_streamed', '1',
-                    '-reconnect_delay_max', '2',
-                    '-timeout', '10000000',
-                    '-vsync', '0',
-                    '-an',
-                    '-sn'
-                ]);
-        } else {
-            command.input(videoPath)
-                .inputOptions([
-                    '-vsync', '0',
-                    '-an',
-                    '-sn'
-                ]);
+                tempVideoPath = path.join(os.tmpdir(), `temp-video-${uniqueId}.mp4`);
+
+                // Calculate how much we need
+                const maxTimestamp = Math.max(...timestamps);
+                const estimatedBytes = Math.ceil(maxTimestamp + 1) * 500000; // ~500KB per second estimate
+                const maxDownload = Math.min(estimatedBytes, 3 * 1024 * 1024); // Cap at 3MB
+
+                console.log(`Downloading ~${(maxDownload / 1024 / 1024).toFixed(1)}MB from ${videoPath}...`);
+
+                const response = await axios({
+                    method: 'GET',
+                    url: videoPath,
+                    responseType: 'stream',
+                    timeout: 10000,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Referer': 'https://ssstik.io/',
+                        'Range': `bytes=0-${maxDownload}`
+                    }
+                });
+
+                if (response.status !== 200 && response.status !== 206) {
+                    throw new Error(`Failed to download video, status: ${response.status}`);
+                }
+
+                // Stream to file with size limit
+                const writer = fs.createWriteStream(tempVideoPath);
+                let downloaded = 0;
+
+                response.data.on('data', (chunk: Buffer) => {
+                    downloaded += chunk.length;
+                    if (downloaded >= maxDownload) {
+                        response.data.destroy(); // Stop early
+                    }
+                });
+
+                await new Promise<void>((resolve, reject) => {
+                    writer.on('finish', () => resolve());
+                    writer.on('error', reject);
+                    response.data.pipe(writer);
+                    response.data.on('error', reject);
+                });
+
+                inputPath = tempVideoPath;
+                console.log(`Downloaded ${(downloaded / 1024 / 1024).toFixed(2)}MB in ${Date.now() - uniqueId}ms`);
+            } catch (dlError: any) {
+                console.error('Error downloading video:', dlError.message);
+                await cleanupTempVideo();
+                return [];
+            }
         }
 
-        command
-            .on('filenames', (files: string[]) => {
-                files.forEach(file => filenames.push(path.join(outputDir, file)));
-                console.log('Expected filenames:', filenames);
-            })
-            .on('start', (commandLine: string) => {
-                console.log('FFmpeg command:', commandLine);
-            })
-            .on('end', () => {
-                console.log('Thumbnails extracted successfully:', filenames);
-                resolve(filenames);
-            })
-            .on('error', (err, stdout, stderr) => {
-                console.error('Error extracting thumbnails:', err.message);
-                console.error('FFmpeg stderr:', stderr);
-                resolve([]);
-            })
-            .screenshots({
-                count: timestamps.length,
-                timestamps: timestamps.map(t => t.toString()),
-                folder: outputDir,
-                filename: `thumb-${uniqueId}-%s.png`
-            });
-    });
+        return new Promise((resolve) => {
+            ffmpeg(inputPath)
+                .inputOptions([
+                    '-vsync', '0',
+                    '-an',
+                    '-sn'
+                ])
+                .on('filenames', (files: string[]) => {
+                    files.forEach(file => filenames.push(path.join(outputDir, file)));
+                })
+                .on('end', async () => {
+                    console.log('Thumbnails extracted successfully:', filenames);
+                    await cleanupTempVideo();
+                    resolve(filenames);
+                })
+                .on('error', async (err) => {
+                    console.error('Error extracting thumbnails:', err.message);
+                    await cleanupTempVideo();
+                    resolve([]);
+                })
+                .screenshots({
+                    count: timestamps.length,
+                    timestamps: timestamps.map(t => t.toString()),
+                    folder: outputDir,
+                    filename: `thumb-${uniqueId}-%s.png`
+                });
+        });
+    } catch (e: any) {
+        console.error('Unexpected error in extractThumbnails:', e.message);
+        await cleanupTempVideo();
+        return [];
+    }
 }
 
 /**
@@ -97,24 +145,5 @@ export async function cleanupThumbnails(filePaths: string[]): Promise<void> {
         } catch (err) {
             console.error(`Failed to delete ${filePath}:`, err);
         }
-    }
-}
-
-/**
- * Convenience function to extract and then cleanup (after a delay or a callback)
- * @param videoPath - Path to the video file
- */
-export async function handleTemporaryThumbnails(videoPath: string): Promise<void> {
-    const timestamps = [1, 3, 5];
-    try {
-        const thumbnails = await extractThumbnails({ videoPath, timestamps });
-
-        // Simulate some work being done with the images
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        await cleanupThumbnails(thumbnails);
-        console.log('Temporary thumbnails cleaned up.');
-    } catch (error) {
-        console.error('Error in handleTemporaryThumbnails:', error);
     }
 }
