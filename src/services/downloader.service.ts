@@ -118,59 +118,69 @@ async function getTiktokInfo(url: string): Promise<unknown> {
     let lastError: any;
 
     for (const version of ApiVersions) {
-      try {
-        const tiktokDl = await TikTokAPI.Downloader(url, { version });
-        const result = tiktokDl.result;
+      const maxAttempts = version === "v2" ? 2 : 1;
 
-        if (
-          result &&
-          ((version === "v2" && result.video?.playAddr) ||
-            (version === "v1" && result.video))
-        ) {
-          const video = result.video as any;
-          const videoUrl = Array.isArray(video.playAddr) && video.playAddr.length
-            ? video.playAddr[0]
-            : video.playAddr;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const tiktokDl = await TikTokAPI.Downloader(url, { version });
+          const result = tiktokDl.result;
 
-          const resultData = {
-            url: videoUrl,
-            author: result.author,
-            thumbnail:
-              version === "v2"
-                ? Array.isArray(result.images) && result.images.length
-                  ? result.images[0]
-                  : result.images
-                : Array.isArray(video.originCover) && video.originCover.length
-                  ? video.originCover[0]
-                  : video.originCover,
-            type: result.type,
-            statistics: result.statistics,
-            description: result.desc,
-            ...(version === "v1" && { duration: video.duration }),
-          };
+          if (
+            result &&
+            ((version === "v2" && result.video?.playAddr) ||
+              (version === "v1" && result.video))
+          ) {
+            const video = result.video as any;
+            const videoUrl = Array.isArray(video.playAddr) && video.playAddr.length
+              ? video.playAddr[0]
+              : video.playAddr;
 
-          console.log(`Checking version ${version} for watermarks...`);
-          const thumbnails = await extractThumbnails({
-            videoPath: videoUrl,
-            timestamps: [1, 2]
-          });
+            const resultData = {
+              url: videoUrl,
+              author: result.author,
+              thumbnail:
+                version === "v2"
+                  ? Array.isArray(result.images) && result.images.length
+                    ? result.images[0]
+                    : result.images
+                  : Array.isArray(video.originCover) && video.originCover.length
+                    ? video.originCover[0]
+                    : video.originCover,
+              type: result.type,
+              statistics: result.statistics,
+              description: result.desc,
+              ...(version === "v1" && { duration: video.duration }),
+            };
 
-          if (thumbnails.length > 0) {
-            const hasWatermark = await detectTextInImages(thumbnails, "ssstik.io");
-            await cleanupThumbnails(thumbnails);
+            console.log(`Checking version ${version} ${maxAttempts > 1 ? `(Attempt ${attempt}/${maxAttempts}) ` : ''}for watermarks...`);
+            const thumbnails = await extractThumbnails({
+              videoPath: videoUrl,
+              timestamps: [1, 2]
+            });
 
-            if (hasWatermark) {
-              console.warn(`Watermark "ssstik.io" detected in TikTok ${version} result. Trying next...`);
-              lastError = new Error("Watermark detected in the result");
-              continue;
+            if (thumbnails.length > 0) {
+              const hasWatermark = await detectTextInImages(thumbnails, "ssstik.io");
+              await cleanupThumbnails(thumbnails);
+
+              if (hasWatermark) {
+                if (attempt < maxAttempts) {
+                  console.warn(`Watermark "ssstik.io" detected in TikTok ${version} (Attempt ${attempt}). Retrying...`);
+                  continue;
+                } else {
+                  console.warn(`Watermark "ssstik.io" detected in TikTok ${version} after ${attempt} attempts. Trying next...`);
+                  lastError = new Error("Watermark detected in the result");
+                  break;
+                }
+              }
             }
-          }
 
-          return resultData;
+            return resultData;
+          }
+        } catch (err) {
+          console.error(`Version ${version} failed:`, err);
+          lastError = err;
+          break;
         }
-      } catch (err) {
-        console.error(`Version ${version} failed:`, err);
-        lastError = err;
       }
     }
 
