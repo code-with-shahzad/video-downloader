@@ -28,17 +28,31 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
     const uniqueId = Date.now();
 
     return new Promise((resolve) => {
-        ffmpeg(videoPath)
-            .inputOptions([
-                '-t 3',
-                '-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36\r\nReferer: https://tikcdn.io/ssstik/\r\n',
+        const isUrl = videoPath.startsWith('http://') || videoPath.startsWith('https://');
+
+        const command = ffmpeg(videoPath);
+
+        if (isUrl) {
+            command.inputOptions([
+                '-t', '3',
+                '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                '-referer', 'https://ssstik.io/',
                 '-reconnect', '1',
                 '-reconnect_streamed', '1',
                 '-reconnect_delay_max', '2',
                 '-vsync', '0',
                 '-an',
                 '-sn'
-            ])
+            ]);
+        } else {
+            command.inputOptions([
+                '-vsync', '0',
+                '-an',
+                '-sn'
+            ]);
+        }
+
+        command
             .on('filenames', (files: string[]) => {
                 files.forEach(file => filenames.push(path.join(outputDir, file)));
             })
@@ -47,7 +61,7 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
                 resolve(filenames);
             })
             .on('error', (err) => {
-                console.error('Error extracting thumbnails:', err);
+                console.error('Error extracting thumbnails:', err.message);
                 resolve([]);
             })
             .screenshots({
