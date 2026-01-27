@@ -1,18 +1,33 @@
 import { createWorker } from 'tesseract.js';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
-let worker: any = null;
+let workerPromise: Promise<any> | null = null;
 
 async function getWorker() {
-    if (worker) return worker;
-    console.log('[OCR] Initializing persistent worker...');
-    worker = await createWorker('eng', 1, {
-        logger: m => null,
-    });
-    await worker.setParameters({
-        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyz0123456789. ',
-    });
-    return worker;
+    if (workerPromise) return workerPromise;
+
+    workerPromise = (async () => {
+        console.log('[OCR] Initializing persistent worker...');
+        const cachePath = path.join(os.tmpdir(), 'ocr-cache-v2');
+        if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath, { recursive: true });
+
+        const w = await createWorker('eng', 1, {
+            logger: m => null,
+            cachePath: cachePath,
+            corePath: path.resolve('./node_modules/tesseract.js-core/tesseract-core.wasm.js'),
+            langPath: 'https://tessdata.projectnaptha.com/4.0.0_best',
+            gzip: true
+        });
+
+        await w.setParameters({
+            tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyz0123456789. ',
+        });
+        return w;
+    })();
+
+    return workerPromise;
 }
 
 // Pre-initialize
