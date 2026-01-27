@@ -50,7 +50,7 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
                 // Calculate how much we need
                 const maxTimestamp = Math.max(...timestamps);
                 const estimatedBytes = Math.ceil(maxTimestamp + 1) * 500000; // ~500KB per second estimate
-                const maxDownload = Math.min(estimatedBytes, 3 * 1024 * 1024); // Cap at 3MB
+                const maxDownload = Math.min(estimatedBytes, 5 * 1024 * 1024); // Cap at 5MB
 
                 console.log(`Downloading ~${(maxDownload / 1024 / 1024).toFixed(1)}MB from ${videoPath}...`);
 
