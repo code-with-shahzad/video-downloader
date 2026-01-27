@@ -30,38 +30,48 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
     return new Promise((resolve) => {
         const isUrl = videoPath.startsWith('http://') || videoPath.startsWith('https://');
 
-        const command = ffmpeg(videoPath);
+        const command = ffmpeg();
 
         if (isUrl) {
-            command.inputOptions([
-                '-t', '3',
-                '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                '-referer', 'https://ssstik.io/',
-                '-reconnect', '1',
-                '-reconnect_streamed', '1',
-                '-reconnect_delay_max', '2',
-                '-vsync', '0',
-                '-an',
-                '-sn'
-            ]);
+            // Set input with protocol options
+            command.input(videoPath)
+                .inputOptions([
+                    '-protocol_whitelist', 'file,http,https,tcp,tls',
+                    '-t', '3',
+                    '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    '-referer', 'https://ssstik.io/',
+                    '-reconnect', '1',
+                    '-reconnect_streamed', '1',
+                    '-reconnect_delay_max', '2',
+                    '-timeout', '10000000',
+                    '-vsync', '0',
+                    '-an',
+                    '-sn'
+                ]);
         } else {
-            command.inputOptions([
-                '-vsync', '0',
-                '-an',
-                '-sn'
-            ]);
+            command.input(videoPath)
+                .inputOptions([
+                    '-vsync', '0',
+                    '-an',
+                    '-sn'
+                ]);
         }
 
         command
             .on('filenames', (files: string[]) => {
                 files.forEach(file => filenames.push(path.join(outputDir, file)));
+                console.log('Expected filenames:', filenames);
+            })
+            .on('start', (commandLine: string) => {
+                console.log('FFmpeg command:', commandLine);
             })
             .on('end', () => {
                 console.log('Thumbnails extracted successfully:', filenames);
                 resolve(filenames);
             })
-            .on('error', (err) => {
+            .on('error', (err, stdout, stderr) => {
                 console.error('Error extracting thumbnails:', err.message);
+                console.error('FFmpeg stderr:', stderr);
                 resolve([]);
             })
             .screenshots({
