@@ -5,6 +5,8 @@ import TikTokAPI from "@tobyg74/tiktok-api-dl";
 import path from "path";
 import { existsSync } from "fs";
 import { fileURLToPath } from "url";
+import { extractThumbnails, cleanupThumbnails } from "./thumbnail.service.js";
+import { detectTextInImages } from "./ocr.service.js";
 
 const filename = fileURLToPath(import.meta.url);
 const directoryName = path.dirname(filename);
@@ -58,16 +60,16 @@ export async function getVideoInfo(
     let result;
     try {
       result = await getYtDlpInfo(url);
-    } catch{
+    } catch {
       result = await mostPowerFullFnc(url)
     }
     return validateYtdlpResponse(result);
   }
 }
 
-async function mostPowerFullFnc(url:string){
-   const stdout = await ytDlpWrap.execPromise([url,...YTDLP_ARGS])
-   return JSON.parse(stdout)
+async function mostPowerFullFnc(url: string) {
+  const stdout = await ytDlpWrap.execPromise([url, ...YTDLP_ARGS])
+  return JSON.parse(stdout)
 }
 
 async function getPlatformInfo(
@@ -109,53 +111,72 @@ async function getTwitterInfo(url: string): Promise<unknown> {
   return validateYtdlpResponse(response);
 }
 
+
 async function getTiktokInfo(url: string): Promise<unknown> {
   try {
-  const ApiVersions: ("v2" | "v1")[] = ["v2", "v1"];
-  let resultData;
+    const ApiVersions: ("v2" | "v1")[] = ["v2", "v1"];
+    let lastError: any;
 
-  for (const version of ApiVersions) {
-    const tiktokDl = await TikTokAPI.Downloader(url, { version });
-    const result = tiktokDl.result;
+    for (const version of ApiVersions) {
+      try {
+        const tiktokDl = await TikTokAPI.Downloader(url, { version });
+        const result = tiktokDl.result;
 
-    if (
-      result &&
-      ((version === "v2" && result.video?.playAddr) ||
-        (version === "v1" && result.video))
-    ) {
-      const video = result.video as any;
+        if (
+          result &&
+          ((version === "v2" && result.video?.playAddr) ||
+            (version === "v1" && result.video))
+        ) {
+          const video = result.video as any;
+          const videoUrl = Array.isArray(video.playAddr) && video.playAddr.length
+            ? video.playAddr[0]
+            : video.playAddr;
 
-      resultData = {
-        url: Array.isArray(video.playAddr) && video.playAddr.length
-          ? video.playAddr[0]
-          : video.playAddr,
-        author: result.author,
-        thumbnail:
-          version === "v2"
-            ? Array.isArray(result.images) && result.images.length
-              ? result.images[0]
-              : result.images
-            : Array.isArray(video.originCover) && video.originCover.length
-            ? video.originCover[0]
-            : video.originCover,
-        type: result.type,
-        statistics: result.statistics,
-        description: result.desc,
-        ...(version === "v1" && { duration: video.duration }),
-      };
+          const resultData = {
+            url: videoUrl,
+            author: result.author,
+            thumbnail:
+              version === "v2"
+                ? Array.isArray(result.images) && result.images.length
+                  ? result.images[0]
+                  : result.images
+                : Array.isArray(video.originCover) && video.originCover.length
+                  ? video.originCover[0]
+                  : video.originCover,
+            type: result.type,
+            statistics: result.statistics,
+            description: result.desc,
+            ...(version === "v1" && { duration: video.duration }),
+          };
 
-      break; 
-    } else {
-      
+          console.log(`Checking version ${version} for watermarks...`);
+          const thumbnails = await extractThumbnails({
+            videoPath: videoUrl,
+            timestamps: [1, 3, 5]
+          });
+
+          if (thumbnails.length > 0) {
+            const hasWatermark = await detectTextInImages(thumbnails, "ssstik.io");
+            await cleanupThumbnails(thumbnails);
+
+            if (hasWatermark) {
+              console.warn(`Watermark "ssstik.io" detected in TikTok ${version} result. Trying next...`);
+              lastError = new Error("Watermark detected in the result");
+              continue;
+            }
+          }
+
+          return resultData;
+        }
+      } catch (err) {
+        console.error(`Version ${version} failed:`, err);
+        lastError = err;
+      }
     }
+
+    throw lastError || new Error("No valid TikTok result found (or all contained watermarks)");
+  } catch (err) {
+    console.error("TikTok extraction failed:", err);
+    throw err;
   }
-
-  if (!resultData) throw new Error("No valid TikTok result found");
-
-  return resultData;
-} catch (err) {
-  console.error("TikTok extraction failed:", err);
-  return err;
-}
-
 }
