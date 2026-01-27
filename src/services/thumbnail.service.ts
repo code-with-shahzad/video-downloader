@@ -26,31 +26,14 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
     const { videoPath, timestamps, outputDir = DEFAULT_TEMP_DIR } = options;
     const filenames: string[] = [];
     const uniqueId = Date.now();
-    let inputPath = videoPath;
-    let tempVideoPath: string | null = null;
-
-    // Helper to cleanup temp video file
-    const cleanupTempVideo = async () => {
-        if (tempVideoPath && fs.existsSync(tempVideoPath)) {
-            try {
-                await fs.promises.unlink(tempVideoPath);
-            } catch (e) {
-                console.error('Failed to delete temp video:', e);
-            }
-        }
-    };
+    let inputStream: any = videoPath;
 
     try {
-        // If videoPath is a URL, download it first
+        // If videoPath is a URL, get the stream
         if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
             try {
                 const { default: axios } = await import('axios');
-                const { promisify } = await import('util');
-                const { pipeline } = await import('stream');
-                const streamPipeline = promisify(pipeline);
-
-                tempVideoPath = path.join(os.tmpdir(), `temp-video-${uniqueId}.mp4`);
-                console.log(`Downloading video from ${videoPath} to ${tempVideoPath}...`);
+                console.log(`Streaming video from ${videoPath}...`);
 
                 const response = await axios({
                     method: 'GET',
@@ -63,26 +46,20 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
                 });
 
                 if (response.status !== 200) {
-                    throw new Error(`Failed to download video, status: ${response.status}`);
+                    throw new Error(`Failed to stream video, status: ${response.status}`);
                 }
 
-                await streamPipeline(response.data, fs.createWriteStream(tempVideoPath));
-                inputPath = tempVideoPath;
-                console.log('Video downloaded successfully.');
+                inputStream = response.data;
             } catch (dlError) {
-                console.error('Error downloading video for thumbnail extraction:', dlError);
-                return []; // Fail gracefully if download fails
+                console.error('Error streaming video for thumbnail extraction:', dlError);
+                return [];
             }
         }
 
         return new Promise((resolve) => {
-            ffmpeg(inputPath)
+            ffmpeg(inputStream)
                 .inputOptions([
                     '-t 3',
-                    // Headers are handled by axios now if we downloaded, but if it was local file these are ignored.
-                    // If we failed to download and somehow still here, we might want headers but we returned empty array above.
-                    // For local files, headers option doesn't hurt but is irrelevant.
-                    // We remove headers here since we are likely acting on a local file now.
                     '-vsync', '0',
                     '-an',
                     '-sn'
@@ -92,12 +69,16 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
                 })
                 .on('end', async () => {
                     console.log('Thumbnails extracted successfully:', filenames);
-                    await cleanupTempVideo();
+                    if (inputStream && typeof inputStream.destroy === 'function') {
+                        inputStream.destroy();
+                    }
                     resolve(filenames);
                 })
                 .on('error', async (err) => {
                     console.error('Error extracting thumbnails:', err);
-                    await cleanupTempVideo();
+                    if (inputStream && typeof inputStream.destroy === 'function') {
+                        inputStream.destroy();
+                    }
                     resolve([]);
                 })
                 .screenshots({
@@ -109,7 +90,6 @@ export async function extractThumbnails(options: ThumbnailOptions): Promise<stri
         });
     } catch (e) {
         console.error('Unexpected error in extractThumbnails:', e);
-        await cleanupTempVideo();
         return [];
     }
 }
